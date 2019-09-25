@@ -4,6 +4,33 @@ const C = require('../constants/constants')
 const SubscriptionRegistry = require('../utils/subscription-registry')
 const DistributedStateRegistry = require('../cluster/distributed-state-registry')
 
+const EVERYONE = 'U'
+
+function parseUserNames (data, socketWrapper) {
+  // Returns all users for backwards compatability
+  if (
+    !data ||
+    data.length === 0 ||
+    (data.length === 1 && (
+    data[0] === C.ACTIONS.QUERY ||
+    data[0] === C.ACTIONS.SUBSCRIBE ||
+    data[0] === C.TOPIC.PRESENCE)
+  )) {
+    return [EVERYONE]
+  }
+  try {
+    return JSON.parse(data[1])
+  } catch (e) {
+    socketWrapper.sendError(
+      C.TOPIC.EVENT,
+      C.EVENT.INVALID_PRESENCE_USERS,
+      'users are required to be a json array of usernames'
+    )
+    return null
+  }
+}
+
+
 /**
  * This class handles incoming and outgoing messages in relation
  * to deepstream presence. It provides a way to inform clients
@@ -40,12 +67,13 @@ module.exports = class PresenceHandler {
   * @returns {void}
   */
   handle (socketWrapper, message) {
+    const users = parseUserNames(message.data, socketWrapper)
     if (message.action === C.ACTIONS.SUBSCRIBE) {
       this._subscriptionRegistry.subscribe(C.TOPIC.PRESENCE, socketWrapper)
     } else if (message.action === C.ACTIONS.UNSUBSCRIBE) {
       this._subscriptionRegistry.unsubscribe(C.TOPIC.PRESENCE, socketWrapper)
     } else if (message.action === C.ACTIONS.QUERY) {
-      this._handleQuery(socketWrapper)
+      this._handleQuery(users, message.data[0], socketWrapper)
     } else {
       this._options.logger.log(C.LOG_LEVEL.WARN, C.EVENT.UNKNOWN_ACTION, message.action)
 
@@ -102,14 +130,23 @@ module.exports = class PresenceHandler {
   * @private
   * @returns {void}
   */
-  _handleQuery (socketWrapper) {
+ _handleQuery (users, correlationId, socketWrapper) {
+  if (users[0] === EVERYONE) {
     const clients = this._connectedClients.getAll()
     const index = clients.indexOf(socketWrapper.user)
     if (index !== -1) {
       clients.splice(index, 1)
     }
     socketWrapper.sendMessage(C.TOPIC.PRESENCE, C.ACTIONS.QUERY, clients)
+  } else {
+    const result = {}
+    const clients = this._connectedClients.getAllMap()
+    for (let i = 0; i < users.length; i++) {
+      result[users[i]] = !!clients[users[i]]
+    }
+    socketWrapper.sendMessage(C.TOPIC.PRESENCE, C.ACTIONS.QUERY, [correlationId, result])
   }
+}
 
   /**
   * Alerts all clients who are subscribed to

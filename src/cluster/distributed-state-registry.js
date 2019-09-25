@@ -137,6 +137,10 @@ module.exports = class DistributedStateRegistry extends EventEmitter {
     return Object.keys(this._data)
   }
 
+  getAllMap () {
+    return this._data
+  }
+
   /**
   * Removes an entry for a given serverName. If the serverName
   * was the last node that held the entry, the entire entry will
