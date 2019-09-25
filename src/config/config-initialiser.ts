@@ -249,18 +249,20 @@ function resolvePluginClass (plugin: PluginConfig, type: any, logLevel: LOG_LEVE
   let requirePath
   let pluginConstructor
   let es6Adaptor
+  const formattedType = typeof type === 'string' ? type.toLowerCase() : type
+  const formattedPluginName = typeof plugin.name === 'string' ? plugin.name.toLowerCase() : plugin.name
   if (plugin.path != null) {
     requirePath = fileUtils.lookupLibRequirePath(plugin.path)
     es6Adaptor = req(requirePath)
     pluginConstructor = es6Adaptor.default ? es6Adaptor.default : es6Adaptor
   } else if (plugin.name != null && type) {
     try {
-      requirePath = fileUtils.lookupLibRequirePath(`@deepstream/${type}-${plugin.name}`)
+      requirePath = fileUtils.lookupLibRequirePath(`@deepstream/${formattedType}-${formattedPluginName}`)
       es6Adaptor = req(requirePath)
     } catch (firstError) {
       const firstPath = requirePath
       try {
-        requirePath = fileUtils.lookupLibRequirePath(`deepstream.io-${type}-${plugin.name}`)
+        requirePath = fileUtils.lookupLibRequirePath(`deepstream.io-${formattedType}-${formattedPluginName}`)
         es6Adaptor = req(requirePath)
       } catch (secondError) {
         if (Number(LOG_LEVEL[logLevel]) === LOG_LEVEL.DEBUG) {
